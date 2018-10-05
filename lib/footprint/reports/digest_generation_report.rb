@@ -4,7 +4,7 @@ require 'footprint/reports/base_report'
 module Footprint
   module Reports
     class DigestGenerationReport < BaseReport
-
+      attr_accessor :event_report
     end
   end
 end

@@ -7,5 +7,11 @@ module Footprint
         s.time_offset_ms < (event.time_offset_ms + max_time_ms)
       end
     end
+
+    def next(event, _match_conditions=nil)
+      self.select do |s|
+        s.time_offset_ms > event.time_offset_ms
+      end.first
+    end
   end
 end

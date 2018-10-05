@@ -17,8 +17,8 @@ module Footprint
                           }
     end
 
-    def query(digest_list)
-      JSON.parse(conn.post('/media/query', {digests: digest_list.db_format}).body)
+    def query(digest_list, threshold=1.0)
+      JSON.parse(conn.post('/media/query', {threshold: threshold, digests: digest_list.db_format}).body)
     end
 
     private
