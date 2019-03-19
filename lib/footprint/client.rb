@@ -1,3 +1,4 @@
+require 'faraday'
 module Footprint
   class Client
     def initialize(database_url="http://api:3000")
@@ -6,6 +7,10 @@ module Footprint
 
     def clear!
       conn.post '/media/clear'
+    end
+
+    def stats
+      JSON.parse(conn.get('/media/stats').body)
     end
 
     def add_media(file_path, metadata, digest_list)
@@ -26,6 +31,8 @@ module Footprint
     def conn
       @conn ||= Faraday.new(:url => @database_url) do |faraday|
         faraday.request  :url_encoded
+        faraday.options[:open_timeout] = 30
+        faraday.options[:timeout] = 30
         faraday.adapter  Faraday.default_adapter
       end
     end

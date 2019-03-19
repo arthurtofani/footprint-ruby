@@ -6,7 +6,7 @@ module Footprint
       attr_accessor :reports
 
       def total_time
-        self.benchmark.total
+        self.benchmark.real
       end
 
       def files

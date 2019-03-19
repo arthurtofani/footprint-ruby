@@ -5,26 +5,29 @@ module Footprint
   class System
 
     class << self
+      attr_accessor :generate_events_strategies, :generate_digests_strategies, :scoring_var
+
       def generate_events(&block)
-        @@generate_events_strategies ||= []
-        @@generate_events_strategies << block
+        @generate_events_strategies ||= []
+        @generate_events_strategies << block
       end
 
       def generate_digests(&block)
-        @@generate_digests_strategies ||= []
-        @@generate_digests_strategies << block
+        @generate_digests_strategies ||= []
+        @generate_digests_strategies << block
       end
 
       def scoring(&block)
-        @@scoring = block
+        @scoring_var = block
       end
 
     end
 
     attr_reader :database, :config
+    attr_accessor :evaluator
     def initialize(config)
       @config = config
-      @database = Client.new(config[:database_url])
+      @database = Client.new(config.database_url)
     end
 
 
@@ -32,18 +35,18 @@ module Footprint
     # returns a report object
     def add_files(file_path_list)
       files = File.open(file_path_list).read.split("\n")
-      reports = {}
-      Reports::FileInputReport.generate(files) do
-        ct_files = files.count
-        files.each_with_index do |file_path, idx|
-          event_report = generate_events(file_path)
-          digest_report = collect_digests(event_report)
-          metadata = extract_metadata(file_path)
-          database.add_media(file_path, metadata, digest_report.output)
-          puts "File added: #{file_path} - #{(idx/ct_files.to_f)}"
-          reports[file_path] = {events: event_report, digests: digest_report, metadata: metadata}
-        end
-      end.tap{|s| s.reports = reports }
+      ct_files = files.count
+      files.each_with_index do |file_path, idx|
+        add_file(file_path)
+        puts "File added: #{file_path} - #{(idx/ct_files.to_f)}"
+      end
+    end
+
+    def add_file(file_path)
+      events = generate_events(file_path)
+      digests = collect_digests(events)
+      metadata = extract_metadata(file_path)
+      database.add_media(file_path, metadata, digests)
     end
 
     def run_queries(query_path_list)
@@ -55,34 +58,29 @@ module Footprint
     end
 
     def query(query_path, threshold=nil)
-      report = nil
-      Reports::QueryReport.generate(query_path) do
-        event_report = generate_events(query_path)
-        digest_report = collect_digests(event_report)
-        db_result = database.query(digest_report.output, threshold)
-        report = {events: event_report, digests: digest_report}
-        r = run_scoring(db_result)
-      end.tap{|s| s.report = report}
+      events = generate_events(query_path)
+      digests = collect_digests(events)
+      db_result = database.query(digests, threshold)
+      r = run_scoring(db_result)
+    end
+
+    def evaluate
+      @config.evaluator_class
     end
 
     def generate_events(file_path)
-      Reports::EventGenerationReport.generate(file_path) do
-        self.run_generate_events(file_path)
-      end
+      run_generate_events(file_path)
     end
 
-    def collect_digests(event_report)
-      events = event_report.output
-      Reports::DigestGenerationReport.generate(events) do
-        self.run_generate_digests(events)
-      end.tap{|s| s.event_report = event_report }
+    def collect_digests(events)
+      self.run_generate_digests(events)
     end
 
     # Each block shall return an Event array
     # The method retuns an array with all events collected
     def run_generate_events(file_path)
       event_list = []
-      @@generate_events_strategies.each do |gen_event_strategy_block|
+      self.class.generate_events_strategies.each do |gen_event_strategy_block|
         event_list += gen_event_strategy_block.call(file_path, self)
       end
       EventList.new(event_list)
@@ -92,7 +90,7 @@ module Footprint
     # The method retuns an array with all digests collected
     def run_generate_digests(event_list)
       digest_list = []
-      @@generate_digests_strategies.each do |gen_digest_strategy_block|
+      self.class.generate_digests_strategies.each do |gen_digest_strategy_block|
         digest_list += gen_digest_strategy_block.call(EventList.new(event_list), self)
       end
       DigestList.new(digest_list)
@@ -100,7 +98,7 @@ module Footprint
 
     def run_scoring(digest_list)
       r = digest_list.keys.map do |key|
-        [key, @@scoring.call(key, digest_list)]
+        [key, self.class.scoring_var.call(key, digest_list)]
       end
       r.sort{|a, b| b[1]<=>a[1]}
     end

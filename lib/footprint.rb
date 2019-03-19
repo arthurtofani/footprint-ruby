@@ -1,6 +1,9 @@
 require "footprint/version"
 require 'footprint/system'
 require 'footprint/client'
+require 'footprint/config'
+require 'footprint/cli'
+require 'footprint/evaluator'
 require 'footprint/event'
 require 'footprint/event_list'
 require 'footprint/digest'
