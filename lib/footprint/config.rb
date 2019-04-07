@@ -7,23 +7,27 @@ module Footprint
       new.load_file(file_path)
     end
 
-    attr_accessor :file_path, :method_name, :database_url, :evaluator, :results_folder
+    attr_accessor :file_path
     def initialize
     end
 
     def load_file(file_path)
       self.file_path = file_path
-      (json = JSON.parse(File.open(self.file_path).read)) rescue raise 'File not found'
-      self.method_name = json['method_name']
-      self.database_url = json['database_url']
-      self.evaluator = json['evaluator']
-      self.results_folder = json['results_folder']
+      (@json = JSON.parse(File.open(self.file_path).read)) rescue raise 'File not found'
+      @json.keys.each do |arg|
+        unless self.methods.include?(arg)
+          self.class.send(:define_method, arg) do |&block|
+            @json[arg]
+          end
+        end
+      end
       return self
     end
 
     def init!
       method_object = method_class.new(self)
-      ev_obj = evaluator_class.new(method_object, self)
+      ev_obj = evaluator_class.new(method_object)
+      method_object.add_observer ev_obj
       method_object.evaluator = ev_obj
       method_object
     end

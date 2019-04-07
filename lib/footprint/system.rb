@@ -3,9 +3,11 @@ require 'pry'
 
 module Footprint
   class System
+    include Footprint::Observable
+    include Footprint::Observer
 
     class << self
-      attr_accessor :generate_events_strategies, :generate_digests_strategies, :scoring_var
+      attr_accessor :generate_events_strategies, :generate_digests_strategies, :scoring_var, :hashing_var
 
       def generate_events(&block)
         @generate_events_strategies ||= []
@@ -21,25 +23,35 @@ module Footprint
         @scoring_var = block
       end
 
+      def hashing(&block)
+        @hashing_var = block
+      end
+
     end
 
     attr_reader :database, :config
     attr_accessor :evaluator
     def initialize(config)
       @config = config
-      @database = Client.new(config.database_url)
+      @database = Client.new(config)
+      add_observer(self)
+      notify_observers(CallbackEvents::StartEvent.new)
     end
 
 
     # add digests to the database based on a list of file_paths
     # returns a report object
-    def add_files(file_path_list)
-      files = File.open(file_path_list).read.split("\n")
+    def add_files(file_list_path)
+      files = File.open(file_list_path).read.split("\n")
       ct_files = files.count
+      file_added_events = []
       files.each_with_index do |file_path, idx|
-        add_file(file_path)
-        puts "File added: #{file_path} - #{(idx/ct_files.to_f)}"
+        file_added_events << add_file(file_path)
+        puts "File added: #{file_path} - #{(100*idx/ct_files.to_f)}%"
       end
+      event = CallbackEvents::MultipleFilesAddedEvent.new(file_list_path, file_added_events)
+      notify_observers(event)
+      event
     end
 
     def add_file(file_path)
@@ -47,6 +59,9 @@ module Footprint
       digests = collect_digests(events)
       metadata = extract_metadata(file_path)
       database.add_media(file_path, metadata, digests)
+      event = CallbackEvents::FileAddedEvent.new(file_path, events, digests)
+      notify_observers(event)
+      event
     end
 
     def run_queries(query_path_list)
@@ -65,7 +80,16 @@ module Footprint
     end
 
     def evaluate
-      @config.evaluator_class
+      evaluator.evaluate
+    end
+
+    def hash_digest(digest)
+      hsh = self.class.hashing_var.call(digest.digest)
+      prev_digest = digest.digest
+      digest.digest = hsh
+      event = CallbackEvents::DigestHashedEvent.new(digest, prev_digest)
+      notify_observers(event)
+      digest
     end
 
     def generate_events(file_path)
@@ -83,7 +107,9 @@ module Footprint
       self.class.generate_events_strategies.each do |gen_event_strategy_block|
         event_list += gen_event_strategy_block.call(file_path, self)
       end
-      EventList.new(event_list)
+      ev_list = EventList.new(event_list)
+      ev_list.file_path = file_path
+      ev_list
     end
 
     # Each block shall return a Digest array
@@ -91,8 +117,9 @@ module Footprint
     def run_generate_digests(event_list)
       digest_list = []
       self.class.generate_digests_strategies.each do |gen_digest_strategy_block|
-        digest_list += gen_digest_strategy_block.call(EventList.new(event_list), self)
+        digest_list += gen_digest_strategy_block.call(event_list, self)
       end
+      digest_list.each{|digest| hash_digest(digest) }
       DigestList.new(digest_list)
     end
 
