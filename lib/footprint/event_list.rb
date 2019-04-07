@@ -1,5 +1,8 @@
 module Footprint
   class EventList < Array
+
+    attr_accessor :file_path
+
     def neighbors_in_time_window_for(event, min_time_ms, max_time_ms)
       self.select do |s|
         s!=event &&

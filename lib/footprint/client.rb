@@ -1,8 +1,9 @@
 require 'faraday'
 module Footprint
   class Client
-    def initialize(database_url="http://api:3000")
-      @database_url = database_url
+    def initialize(config, database_url="http://api:3000")
+      @config = config
+      @database_url = config.database_url
     end
 
     def clear!
@@ -22,8 +23,8 @@ module Footprint
                           }
     end
 
-    def query(digest_list, threshold=1.0)
-      JSON.parse(conn.post('/media/query', {threshold: threshold, digests: digest_list.db_format}).body)
+    def query(digest_list)
+      JSON.parse(conn.post('/media/query', {digests: digest_list.db_format}).body)
     end
 
     private

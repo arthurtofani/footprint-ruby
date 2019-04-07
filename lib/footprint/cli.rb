@@ -35,7 +35,7 @@ module Footprint
 
 
 
-    desc "evaluate STRATEGY_NAME --files path/to/files.txt --config path/to/config.json",
+    desc "evaluate --files path/to/files.txt --config path/to/config.json",
          "Evaluates database"
     def evaluate
       footprint.evaluate
