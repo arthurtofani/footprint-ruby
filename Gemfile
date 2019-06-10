@@ -7,3 +7,4 @@ gemspec
 gem 'faraday'
 gem 'thor'
 gem 'activesupport'
+gem 'taglib-ruby'

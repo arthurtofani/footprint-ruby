@@ -1,6 +1,8 @@
 module Footprint
   class EventList < Array
 
+    include Concerns::TimeMeasured
+
     attr_accessor :file_path
 
     def neighbors_in_time_window_for(event, min_time_ms, max_time_ms)
@@ -16,5 +18,6 @@ module Footprint
         s.time_offset_ms > event.time_offset_ms
       end.first
     end
+
   end
 end

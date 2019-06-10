@@ -7,7 +7,7 @@ module Footprint
     end
 
     def clear!
-      conn.post '/media/clear'
+      conn.post "/buckets/#{@config.bucket}/clear"
     end
 
     def stats
@@ -16,15 +16,18 @@ module Footprint
 
     def add_media(file_path, metadata, digest_list)
       digests = digest_list.db_format
-      conn.post '/media', {
+      conn.post "/buckets/#{@config.bucket}/media", {
                             path: file_path,
                             metadata: metadata,
-                            digests: digests
+                            digests: digests,
+                            bucket: @config.bucket
                           }
     end
 
-    def query(digest_list)
-      JSON.parse(conn.post('/media/query', {digests: digest_list.db_format}).body)
+    def query(digest_list, threshold)
+      url = "/buckets/#{@config.bucket}/query"
+      obj = {digests: digest_list.db_format, stopwords_threshold: threshold}
+      JSON.parse(conn.post(url, obj).body)
     end
 
     private
@@ -32,8 +35,8 @@ module Footprint
     def conn
       @conn ||= Faraday.new(:url => @database_url) do |faraday|
         faraday.request  :url_encoded
-        faraday.options[:open_timeout] = 30
-        faraday.options[:timeout] = 30
+        faraday.options[:open_timeout] = 300
+        faraday.options[:timeout] = 300
         faraday.adapter  Faraday.default_adapter
       end
     end
